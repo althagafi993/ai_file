@@ -141,37 +141,39 @@
     }
 
     .edit-area {
-      padding: 7px 9px;
+      padding: 5px 7px;
       font-size: clamp(13px, 1.18vw, 18px);
       resize: none;
       overflow: hidden;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-word;
+      hyphens: auto;
     }
 
     .slot.big .edit-area {
-      padding: 9px 11px;
+      padding: 6px 8px;
       font-size: clamp(13px, 1.14vw, 17px);
     }
 
     .slot.medium .edit-area {
-      padding-top: 6px;
+      padding-top: 4px;
     }
 
     .print-field {
       display: none;
-      padding: 7px 9px;
+      padding: 5px 7px;
       font-size: clamp(13px, 1.18vw, 18px);
-      line-height: 1.2;
+      line-height: 1.14;
       white-space: pre-wrap;
       word-break: break-word;
       overflow-wrap: anywhere;
+      hyphens: auto;
       overflow: hidden;
     }
 
     .slot.big .print-field {
-      padding: 9px 11px;
+      padding: 6px 8px;
       font-size: clamp(13px, 1.14vw, 17px);
     }
 
@@ -768,30 +770,44 @@
       const styles = window.getComputedStyle(field);
       const rawBaseLine = parseFloat(styles.lineHeight);
       const baseFont = parseFloat(field.dataset.baseFont || styles.fontSize);
-      const baseLine = parseFloat(field.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.35));
-      const minFont = parseFloat(field.dataset.minFont || (field.closest('.slot.big') ? '6.6' : field.closest('.slot.medium') ? '7.1' : '7.5'));
-      const minLine = Math.max(minFont + 0.1, parseFloat(field.dataset.minLineHeight || (minFont * 1.02)));
+      const baseLine = parseFloat(field.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.32));
+      const minFont = parseFloat(field.dataset.minFont || (field.closest('.slot.big') ? '6.2' : field.closest('.slot.medium') ? '6.6' : '6.9'));
+      const minLine = Math.max(minFont * 0.98, parseFloat(field.dataset.minLineHeight || (minFont * 1.06)));
 
       if (!field.dataset.baseFont) field.dataset.baseFont = String(baseFont);
       if (!field.dataset.baseLineHeight) field.dataset.baseLineHeight = String(baseLine);
 
-      let currentFont = baseFont;
-      let currentLine = baseLine;
-      field.style.fontSize = currentFont + 'px';
-      field.style.lineHeight = currentLine + 'px';
-
       const fits = () => field.scrollHeight <= field.clientHeight + 1 && field.scrollWidth <= field.clientWidth + 1;
-      while (!fits() && currentFont > minFont) {
-        currentFont = Math.max(minFont, currentFont - 0.25);
-        currentLine = Math.max(minLine, currentLine - 0.18);
-        field.style.fontSize = currentFont + 'px';
-        field.style.lineHeight = currentLine + 'px';
+      const apply = (font, line) => {
+        field.style.fontSize = font + 'px';
+        field.style.lineHeight = line + 'px';
+      };
+
+      let low = minFont;
+      let high = baseFont;
+      let bestFont = minFont;
+      let bestLine = minLine;
+
+      while (high - low > 0.1) {
+        const mid = (low + high) / 2;
+        const ratio = baseFont > 0 ? (mid / baseFont) : 1;
+        const line = Math.max(minLine, Math.min(baseLine, baseLine * ratio * 0.985));
+        apply(mid, line);
+        if (fits()) {
+          bestFont = mid;
+          bestLine = line;
+          low = mid;
+        } else {
+          high = mid;
+        }
       }
+
+      apply(bestFont, bestLine);
 
       const printTarget = byId('print-' + field.id);
       if (printTarget) {
-        printTarget.style.fontSize = currentFont + 'px';
-        printTarget.style.lineHeight = currentLine + 'px';
+        printTarget.style.fontSize = bestFont + 'px';
+        printTarget.style.lineHeight = bestLine + 'px';
       }
     }
 
@@ -820,22 +836,36 @@
       const styles = window.getComputedStyle(target);
       const rawBaseLine = parseFloat(styles.lineHeight);
       const baseFont = parseFloat(source?.dataset.baseFont || styles.fontSize);
-      const baseLine = parseFloat(source?.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.25));
-      const minFont = parseFloat(source?.dataset.minFont || (target.closest('.slot.big') ? '6.6' : target.closest('.slot.medium') ? '7.1' : '7.5'));
-      const minLine = Math.max(minFont + 0.1, parseFloat(source?.dataset.minLineHeight || (minFont * 1.02)));
-
-      let currentFont = baseFont;
-      let currentLine = baseLine;
-      target.style.fontSize = currentFont + 'px';
-      target.style.lineHeight = currentLine + 'px';
+      const baseLine = parseFloat(source?.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.22));
+      const minFont = parseFloat(source?.dataset.minFont || (target.closest('.slot.big') ? '6.2' : target.closest('.slot.medium') ? '6.6' : '6.9'));
+      const minLine = Math.max(minFont * 0.98, parseFloat(source?.dataset.minLineHeight || (minFont * 1.06)));
 
       const fits = () => target.scrollHeight <= target.clientHeight + 1 && target.scrollWidth <= target.clientWidth + 1;
-      while (!fits() && currentFont > minFont) {
-        currentFont = Math.max(minFont, currentFont - 0.25);
-        currentLine = Math.max(minLine, currentLine - 0.18);
-        target.style.fontSize = currentFont + 'px';
-        target.style.lineHeight = currentLine + 'px';
+      const apply = (font, line) => {
+        target.style.fontSize = font + 'px';
+        target.style.lineHeight = line + 'px';
+      };
+
+      let low = minFont;
+      let high = baseFont;
+      let bestFont = minFont;
+      let bestLine = minLine;
+
+      while (high - low > 0.1) {
+        const mid = (low + high) / 2;
+        const ratio = baseFont > 0 ? (mid / baseFont) : 1;
+        const line = Math.max(minLine, Math.min(baseLine, baseLine * ratio * 0.985));
+        apply(mid, line);
+        if (fits()) {
+          bestFont = mid;
+          bestLine = line;
+          low = mid;
+        } else {
+          high = mid;
+        }
       }
+
+      apply(bestFont, bestLine);
     }
 
     function fitPrintField(source, target) {
@@ -1180,8 +1210,8 @@
       const settings = options || {};
       const fontFamily = styles.fontFamily || 'Tahoma, Arial, sans-serif';
       const fontWeight = styles.fontWeight || '400';
-      const fontSize = Math.max(8, parsePxValue(styles.fontSize, 14) * scaleY);
-      const lineHeight = Math.max(fontSize * 1.15, parsePxValue(styles.lineHeight, fontSize * 1.2) * scaleY);
+      const fontSize = Math.max(6.2, parsePxValue(styles.fontSize, 14) * scaleY);
+      const lineHeight = Math.max(fontSize * 1.05, parsePxValue(styles.lineHeight, fontSize * 1.12) * scaleY);
       const paddingTop = parsePxValue(styles.paddingTop, 0) * scaleY;
       const paddingRight = parsePxValue(styles.paddingRight, 0) * scaleX;
       const paddingBottom = parsePxValue(styles.paddingBottom, 0) * scaleY;
