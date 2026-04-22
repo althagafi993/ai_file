@@ -576,7 +576,7 @@
       <div class="overlay">
         
       <div class="slot big" style="left:15.1491%; top:19.6123%; width:26.7526%; height:5.6442%;">
-        <textarea id="email" class="edit-area ltr" placeholder="name@school.edu.sa"></textarea>
+        <textarea id="email" class="edit-area ltr" data-min-font="8.7" data-min-line-height="9.8" data-max-lines="4" placeholder="name@school.edu.sa"></textarea>
         <div id="print-email" class="print-field ltr"></div>
       </div>
     
@@ -596,22 +596,22 @@
       </div>
     
       <div class="slot medium" style="left:16.5189%; top:33.9225%; width:38.6785%; height:2.7366%;">
-        <textarea id="problem" class="edit-area" placeholder="اكتب المشكلة التعليمية أو الإدارية"></textarea>
+        <textarea id="problem" class="edit-area" data-min-font="8.9" data-min-line-height="10.0" data-max-lines="5" placeholder="اكتب المشكلة التعليمية أو الإدارية"></textarea>
         <div id="print-problem" class="print-field"></div>
       </div>
     
       <div class="slot medium" style="left:16.5189%; top:37.1152%; width:38.6785%; height:3.5918%;">
-        <textarea id="prompt" class="edit-area" placeholder="اكتب الأمر النصي المستخدم في Copilot"></textarea>
+        <textarea id="prompt" class="edit-area" data-min-font="8.9" data-min-line-height="10.0" data-max-lines="5" placeholder="اكتب الأمر النصي المستخدم في Copilot"></textarea>
         <div id="print-prompt" class="print-field"></div>
       </div>
     
       <div class="slot medium" style="left:16.5189%; top:41.1631%; width:38.6785%; height:3.5918%;">
-        <textarea id="promptLink" class="edit-area ltr" placeholder="https://..."></textarea>
+        <textarea id="promptLink" class="edit-area ltr" data-min-font="8.7" data-min-line-height="9.8" data-max-lines="5" placeholder="https://..."></textarea>
         <div id="print-promptLink" class="print-field ltr"></div>
       </div>
     
       <div class="slot medium" style="left:16.5189%; top:45.2109%; width:38.6785%; height:3.5918%;">
-        <textarea id="solution" class="edit-area" placeholder="اكتب الحل المقترح بعد المراجعة"></textarea>
+        <textarea id="solution" class="edit-area" data-min-font="8.9" data-min-line-height="10.0" data-max-lines="5" placeholder="اكتب الحل المقترح بعد المراجعة"></textarea>
         <div id="print-solution" class="print-field"></div>
       </div>
     
@@ -770,13 +770,19 @@
       const styles = window.getComputedStyle(field);
       const rawBaseLine = parseFloat(styles.lineHeight);
       const baseFont = parseFloat(field.dataset.baseFont || styles.fontSize);
-      const baseLine = parseFloat(field.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.32));
-      const minFont = parseFloat(field.dataset.minFont || (field.closest('.slot.big') ? '6.2' : field.closest('.slot.medium') ? '6.6' : '6.9'));
-      const minLine = Math.max(minFont * 0.98, parseFloat(field.dataset.minLineHeight || (minFont * 1.06)));
+      const baseLine = parseFloat(field.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.28));
+      const minFont = parseFloat(field.dataset.minFont || (field.closest('.slot.big') ? '8.4' : field.closest('.slot.medium') ? '8.9' : '9.2'));
+      const minLine = Math.max(minFont * 1.06, parseFloat(field.dataset.minLineHeight || (minFont * 1.12)));
+      const maxLines = parseInt(field.dataset.maxLines || (field.closest('.slot.medium') ? '5' : field.closest('.slot.big') ? '5' : '4'), 10);
+      const minComfortLines = parseInt(field.dataset.minComfortLines || '3', 10);
 
       if (!field.dataset.baseFont) field.dataset.baseFont = String(baseFont);
       if (!field.dataset.baseLineHeight) field.dataset.baseLineHeight = String(baseLine);
 
+      const getLineCount = () => {
+        const lineHeight = parseFloat(window.getComputedStyle(field).lineHeight) || 1;
+        return Math.max(1, Math.round(field.scrollHeight / lineHeight));
+      };
       const fits = () => field.scrollHeight <= field.clientHeight + 1 && field.scrollWidth <= field.clientWidth + 1;
       const apply = (font, line) => {
         field.style.fontSize = font + 'px';
@@ -791,14 +797,35 @@
       while (high - low > 0.1) {
         const mid = (low + high) / 2;
         const ratio = baseFont > 0 ? (mid / baseFont) : 1;
-        const line = Math.max(minLine, Math.min(baseLine, baseLine * ratio * 0.985));
+        const line = Math.max(minLine, Math.min(baseLine, baseLine * (0.99 + ratio * 0.01)));
         apply(mid, line);
-        if (fits()) {
+        const lineCount = getLineCount();
+        const ok = fits() && lineCount <= maxLines;
+        if (ok) {
           bestFont = mid;
           bestLine = line;
           low = mid;
         } else {
           high = mid;
+        }
+      }
+
+      apply(bestFont, bestLine);
+
+      let lineCount = getLineCount();
+      if (lineCount < minComfortLines && bestFont < baseFont - 0.3) {
+        let comfortFont = Math.min(baseFont, bestFont + 0.8);
+        while (comfortFont > bestFont) {
+          const ratio = baseFont > 0 ? (comfortFont / baseFont) : 1;
+          const comfortLine = Math.max(minLine, Math.min(baseLine, baseLine * (0.99 + ratio * 0.01)));
+          apply(comfortFont, comfortLine);
+          lineCount = getLineCount();
+          if (fits() && lineCount <= maxLines) {
+            bestFont = comfortFont;
+            bestLine = comfortLine;
+            break;
+          }
+          comfortFont -= 0.2;
         }
       }
 
@@ -836,10 +863,15 @@
       const styles = window.getComputedStyle(target);
       const rawBaseLine = parseFloat(styles.lineHeight);
       const baseFont = parseFloat(source?.dataset.baseFont || styles.fontSize);
-      const baseLine = parseFloat(source?.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.22));
-      const minFont = parseFloat(source?.dataset.minFont || (target.closest('.slot.big') ? '6.2' : target.closest('.slot.medium') ? '6.6' : '6.9'));
-      const minLine = Math.max(minFont * 0.98, parseFloat(source?.dataset.minLineHeight || (minFont * 1.06)));
+      const baseLine = parseFloat(source?.dataset.baseLineHeight || (Number.isFinite(rawBaseLine) ? rawBaseLine : baseFont * 1.18));
+      const minFont = parseFloat(source?.dataset.minFont || (target.closest('.slot.big') ? '8.4' : target.closest('.slot.medium') ? '8.9' : '9.2'));
+      const minLine = Math.max(minFont * 1.06, parseFloat(source?.dataset.minLineHeight || (minFont * 1.12)));
+      const maxLines = parseInt(source?.dataset.maxLines || (target.closest('.slot.medium') ? '5' : target.closest('.slot.big') ? '5' : '4'), 10);
 
+      const getLineCount = () => {
+        const lineHeight = parseFloat(window.getComputedStyle(target).lineHeight) || 1;
+        return Math.max(1, Math.round(target.scrollHeight / lineHeight));
+      };
       const fits = () => target.scrollHeight <= target.clientHeight + 1 && target.scrollWidth <= target.clientWidth + 1;
       const apply = (font, line) => {
         target.style.fontSize = font + 'px';
@@ -854,9 +886,10 @@
       while (high - low > 0.1) {
         const mid = (low + high) / 2;
         const ratio = baseFont > 0 ? (mid / baseFont) : 1;
-        const line = Math.max(minLine, Math.min(baseLine, baseLine * ratio * 0.985));
+        const line = Math.max(minLine, Math.min(baseLine, baseLine * (0.99 + ratio * 0.01)));
         apply(mid, line);
-        if (fits()) {
+        const lineCount = getLineCount();
+        if (fits() && lineCount <= maxLines) {
           bestFont = mid;
           bestLine = line;
           low = mid;
